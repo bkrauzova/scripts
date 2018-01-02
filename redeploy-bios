@@ -1,0 +1,100 @@
+#!/bin/sh
+#
+# Version 9.12.2016
+#
+# Deploy new image on local container
+
+IMG=$1
+CPATH=/home/lxc
+CONT=bios
+
+usage ()
+{
+    echo -ne "\n"
+    echo -ne "* Run as a root with image name as a parameter *\n"
+    echo -ne "\n"
+}
+
+stopContainer ()
+{
+    echo -ne "\tShutting down $CONT\n"
+    /bin/virsh -c lxc:/// shutdown $1
+    sleep 2
+    
+    return $?
+}
+forceStop ()
+{
+    echo -ne "\tForcing shut down $1\n"
+    /bin/virsh -c lxc:/// destroy $1
+    sleep 2
+    
+    return $?
+}
+
+isRunning ()
+{
+    RESP=`/bin/virsh -c lxc:/// list --state-running | /bin/grep $CONT` 
+    if [ -n "$RESP" ]; then
+        return 0
+    else
+        return 1
+    fi    
+}
+
+runContainer ()
+{
+    echo -ne "\tStaring $CONT\n"
+    /bin/virsh -c lxc:/// start $1
+    sleep 2
+    
+    return $?
+}
+
+deployContainer ()
+{
+    echo -ne "\tRedeploying container \n"
+
+    /bin/rm -Rf $CPATH/$CONT/*
+    # sometimes not everything is remove :-(
+    if [[ $(/bin/ls $CPATH/$CONT/  | /bin/wc -l) -ne 0 ]] ; then
+        /bin/rm -Rf $CPATH/$CONT/*
+        exit 1
+    fi
+    
+    /bin/tar -xz -f $CPATH/$1 -C $CPATH/bios/
+    sleep 2
+}
+
+if [ "$1" = "" ] ; then
+    usage
+    exit 1
+fi
+
+if isRunning ; then
+    stopContainer $CONT
+    
+    if isRunning ; then
+        forceStop $CONT
+    fi
+fi    
+
+deployContainer $1  # img name
+runContainer $CONT
+
+if isRunning ; then
+    echo "SUCCESFULL"
+    exit 0
+else
+    echo "FAILED"
+    exit 1
+fi
+
+
+
+
+
+
+
+
+
