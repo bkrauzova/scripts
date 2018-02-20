@@ -1,0 +1,114 @@
+#!/bin/bash
+# update all forked fty repos and add commit message if not present
+# 9.2.2018
+#set -x
+
+function print_help
+{
+    echo "Fetches latast changes for given repo. Can be run for particular branch, master is default."
+    echo "update-repos [-r -b -a -h]"
+    echo -e "\t -r|--repo     name of the repository"
+    echo -e "\t -b|--branch   branch"
+    echo -e "\t -a|--add      add branch"
+    echo -e "\t -h|--help     display help"
+}
+
+REPO=""
+BRANCH="master"
+PATH42="/home/bstepankova/42ity-github"
+PATHETN="/home/bstepankova/IPM-Infra"
+ADD=0
+
+echo -e "Running with args: $@\n"
+
+while [[ "${#}" -gt 0 ]];
+do
+    case ${1} in
+        -r|--repo)
+            REPO="$2"
+            shift
+            shift
+            ;;
+        -b|--branch)
+            BRANCH="$2"
+            shift
+            shift
+            ;;
+        -a|--add)
+            BRANCH="$2"
+            ADD=1
+            shift
+            shift
+            ;;
+        -h|--help)
+            print_help
+            exit 0
+            ;;
+        --)
+	    shift
+	    break
+	    ;;
+	*)
+	    echo "Unknown parameter ${1}"
+	    shift
+	    ;;
+	esac
+done
+
+if [ -z $REPO ]; then
+    echo -e "Repo name missing. Terminating.\n"
+    exit 1
+fi
+
+if [ ${REPO:0:3} == "fty" -o ${REPO:0:3} == "nut" ]; then
+    RPATH=$PATH42/$REPO
+    REMOTE_URL="git@github.com:42ity/$REPO.git"
+else
+    RPATH=$PATHETN/$REPO
+    REMOTE_URL="ssh://git@bitbucket.mbt.lab.etn.com:7999/$REPO.git"
+fi
+
+# adding color setting, commit msg, upstream
+COMM=`grep "commit" $RPATH/.git/config`
+if [ -z "$COMM" ] ; then
+    echo -e "[commit]\n\ttemplate = ~/.gitmessage\n" >> \
+        $RPATH/.git/config
+    echo -e "Default commit message added\n"
+fi
+
+COLOR=`grep "color" $RPATH/.git/config`
+if [ -z "$COLOR" ]; then
+    echo -e "[color]\n\tdiff = auto\n\tstatus = auto \n\tbranch = auto\n" \
+        >> $RPATH/.git/config
+    echo -e "Colors set.\n"
+fi
+
+UPSTREAM=`grep "upstream" $RPATH/.git/config`
+if [ -z "$UPSTREAM" ]; then
+    echo -e "[remote \"upstream\"]\n\turl = ${REMOTE_URL}\n\t fetch = +refs/heads/*:refs/remotes/upstream/*" >> $RPATH/.git/config
+    echo -e "Remote added.\n"
+fi
+
+if [ $ADD -eq 0 ]; then
+    # pulling from upstream
+    cd $RPATH
+
+    git checkout $BRANCH
+    git pull upstream $BRANCH
+
+else
+    # adding new branch
+    EXIST=`grep "\[branch \"$BRANCH\"\]" $RPATH/.git/config`
+    echo "exists:" $EXIST
+    if [ ! -z "${EXIST}" ]; then
+        echo -e "Branch $BRANCH already exists.\n"
+        exit 1
+    fi
+    echo -e "[branch \"$BRANCH\"] \n\tremote = origin \n\tmerge = refs/heads/$BRANCH\n" \
+        >> $RPATH/.git/config
+    echo -e "Branch $BRANCH added\n"
+
+    git checkout -b $BRANCH # if local copy does not know branch yet, '-b' must be used
+fi
+
+exit 0

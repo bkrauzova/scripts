@@ -1,0 +1,97 @@
+#!/bin/sh
+#
+# version 2015-01-20
+#
+# BS webcam added: 0458:708c
+# version for w10
+
+DEVICES="9710:7830 05e1:0100 050d:1102 0bda:8179 7392:7811 0458:708c"
+VM=w10eaton
+
+function isPresent(){
+    lsusb | grep $1 >/dev/null
+    return $?
+}
+
+function devXML(){
+    VENDOR=`echo $1 | cut -d: -f1`
+    DEVICE=`echo $1 | cut -d: -f2`
+    echo "
+<hostdev mode=\"subsystem\" type=\"usb\" managed=\"yes\">
+  <source>
+    <vendor id=\"0x$VENDOR\"/>
+    <product id=\"0x$DEVICE\"/>
+  </source>
+</hostdev>"
+}
+
+attached() {
+    MACHINE=$1
+    VENDOR=`echo $2 | cut -d: -f1`
+    PRODUCT=`echo $2 | cut -d: -f2`
+    virsh dumpxml "$MACHINE" | awk -vvendor=$VENDOR -vproduct=$PRODUCT '
+    BEGIN{ f="no"; }
+    /<vendor /{ ven = substr($2,7,4) }
+    /<product /{
+      prod = substr($2,7,4);
+      if( prod == product && ven == vendor ) { f="yes"; }
+      prod = "";
+      ven = "";
+    }
+    END { print f; }
+    '
+}
+
+function attachAsNeeded(){
+    MACHINE="$1"
+    XML=/tmp/dev.$$.xml
+    OPTS=""
+    if [ "`vmState $MACHINE`" == "shut off" ] ; then
+        OPTS="--config"
+    fi
+    for DEV in $DEVICES ; do
+	devXML $DEV > $XML
+	if isPresent $DEV ; then
+	    if [ `attached "$MACHINE" "$DEV"` == "yes" ] ; then
+		echo "device $DEV attached already"
+	    else
+		echo "attaching device $DEV"
+		virsh attach-device "$MACHINE" $XML $OPTS  >/dev/null 2>&1
+	    fi
+	else
+	    if [ `attached "$MACHINE" "$DEV"` == "yes" ] ; then
+		echo "detaching device $DEV"
+		virsh detach-device "$MACHINE" $XML $OPTS
+	    else
+		echo "device $DEV detached already"
+	    fi
+	fi
+    done
+    /bin/rm -f $XML >/dev/null 2>&1
+}
+
+function vmState() {
+    virsh dominfo "$1" | awk '/^State:/{
+      print substr($0, index($0,$2) );
+    }'
+}
+
+function vmStart() {
+  if [ "`vmState $1`" == "shut off" ]; then
+    virsh start "$VM"
+  else
+    echo "$1 is not stopped, i'm not going to start it (current state: `vmState $1`)"
+  fi
+}
+
+if [ "$(id -u)" != "0" ] ; then
+    sudo $0
+    nohup vinagre spice://localhost:5900 >/dev/null 2>&1 &
+    sleep 3
+    exit
+fi
+
+
+attachAsNeeded "$VM"
+vmStart "$VM"
+sleep 3
