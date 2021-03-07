@@ -1,0 +1,38 @@
+#!/usr/bin/bash
+
+HDDPATH=/media/HDDbackup
+PCPATH=/home/$USER
+
+function isMounted ()
+{
+    mountpoint $HDDPATH > /dev/null;
+    return $?
+}
+
+function mountHD ()
+{
+    mount $$HDDPATH
+    return $?
+}
+
+function umountHD ()
+{
+    mount $$HDDPATH
+    udisksctl power-off -b /dev/HDDbackup1     # power the drives off
+
+    return $?
+}
+
+if !isMounted ; then
+    mountHD
+fi
+
+if mountHD ; then
+    rsync $PCPATH/ $HDDPATH/ -raPvL
+else
+    echo "mounting $HDDPATH failed"
+fi
+
+umountHD
+
+exit 0
