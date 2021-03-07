@@ -5,7 +5,8 @@
 function print_help
 {
     echo "Fetches latast changes for given repo. Can be run for particular branch, master is default."
-    echo "update-repos [-r -b -a -h]"
+    echo "update-repos [-r -b -a -h -u]"
+    echo -e "\t -u|--update   update all repos"
     echo -e "\t -r|--repo     name of the repository"
     echo -e "\t -b|--branch   branch"
     echo -e "\t -a|--add      add branch"
@@ -23,6 +24,10 @@ echo -e "Running with args: $@\n"
 while [[ "${#}" -gt 0 ]];
 do
     case ${1} in
+        -u|--update)
+            ALL=1
+            break
+            ;;
         -r|--repo)
             REPO="$2"
             shift
@@ -54,6 +59,16 @@ do
 	esac
 done
 
+#if [ $ALL -eq 1 ]; then
+#    for i in `ls $PATH42 | grep fty`; do
+#        echo "not implemented"
+#    done
+
+#    exit 0
+#fi
+
+#exit 0
+
 if [ -z $REPO ]; then
     echo -e "Repo name missing. Terminating.\n"
     exit 1
@@ -61,10 +76,10 @@ fi
 
 if [ ${REPO:0:3} == "fty" -o ${REPO:0:3} == "nut" -o ${REPO:0:3} == "mal" -o ${REPO:0:3} == "czm" ]; then
     RPATH=$PATH42/$REPO
-    REMOTE_URL="git@github.com:42ity/$REPO.git"
+    REMOTE_URL="https://www.github.com/42ity/$REPO.git"
 else
     RPATH=$PATHETN/$REPO
-    REMOTE_URL="ssh://git@bitbucket.mbt.lab.etn.com:7999/bios/$REPO.git"
+    REMOTE_URL="https://bitbucket.mbt.lab.etn.com:7999/bios/$REPO.git"
 fi
 
 # adding commit msg
